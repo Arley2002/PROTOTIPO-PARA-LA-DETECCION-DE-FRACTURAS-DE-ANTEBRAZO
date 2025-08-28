@@ -1,0 +1,3 @@
+python -m pip install streamlit ultralytics opencv-python pillow
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install streamlit fpdf ultralytics opencv-python torch pillow numpy
