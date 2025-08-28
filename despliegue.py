@@ -7,6 +7,7 @@ import torch
 import os
 from datetime import datetime
 import base64
+from io import BytesIO
 from reportlab.lib.units import inch
 from pdf_template import MedicalReportTemplate
 
@@ -24,6 +25,13 @@ except Exception as e:
     st.error(f"❌ No se pudo cargar el modelo. Verifique la ruta: {MODEL_PATH}")
     st.stop()
 
+# Función para convertir imagen a base64
+def image_to_base64(image):
+    """Convierte una imagen PIL a base64 para mostrarla en HTML"""
+    buffered = BytesIO()
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode()
+
 # Directorios
 IMAGES_DIR = "imagenes_cargadas"
 RESULTS_DIR = "resultados"
@@ -37,12 +45,12 @@ st.set_page_config(
     layout="wide"
 )
 
-# Cargar CSS externo
+# Cargar CSS externo 
 def load_css(file_name):
     with open(file_name) as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
-# Aplicar estilos CSS externos
+# Aplicar estilos CSS externos 
 try:
     load_css('styles.css')
 except FileNotFoundError:
@@ -50,7 +58,7 @@ except FileNotFoundError:
 
 # Título principal con logo
 try:
-    # Intentar cargar el logo
+    # Cargar el logo
     logo_path = r"D:\DeteccionDeFracturas\Logo.png"
     if os.path.exists(logo_path):
         col1, col2, col3 = st.columns([1, 4, 1])
@@ -66,7 +74,7 @@ except Exception:
     st.markdown('<div class="medical-header"><h1 style="color: #0d47a1; font-size: 24px;">🩺 PROTOTIPO PARA LA DETECCIÓN DE FRACTURAS DE ANTEBRAZO A PARTIR DEL ANÁLISIS DE IMÁGENES RADIOLÓGICAS, UTILIZANDO REDES NEURONALES CONVOLUCIONALES</h1><p style="color: #1565c0;">Herramienta de apoyo diagnóstico asistida por inteligencia artificial</p></div>', unsafe_allow_html=True)
 
 # Función para redimensionar imágenes manteniendo relación de aspecto
-def resize_image(image, max_width=300):  # Reducido de 700 a 200
+def resize_image(image, max_width=300):  # Reducido de 700 a 300
     width_percent = (max_width / float(image.size[0]))
     new_height = int((float(image.size[1]) * float(width_percent)))
     return image.resize((max_width, new_height), Image.Resampling.LANCZOS)
@@ -93,7 +101,7 @@ if 'max_class' not in st.session_state:
 if 'max_confidence' not in st.session_state:
     st.session_state.max_confidence = 0.0
 
-# --- Paso 1: Cargar imagen ---
+# --- Paso 1: Cargar imagen ---/////////////////////////////////////////////////////////
 st.header("1️⃣ Carga de Radiografía")
 st.markdown("Suba una imagen para análisis. Formatos aceptados: JPG, PNG")
 
@@ -109,14 +117,21 @@ if uploaded_file is not None:
         
         # Crear contenedor principal para mejor alineación
         main_container = st.container()
-        
+
         with main_container:
             # Primera fila: Imágenes alineadas
             col1, col2 = st.columns([1, 1])
             
             with col1:
                 resized_image = resize_image(image)
-                st.image(resized_image, use_container_width=False, caption="Radiografía original")
+                # Imagen centrada 
+                st.markdown(
+                    f'<div style="display: flex; justify-content: center;">'
+                    f'<img src="data:image/png;base64,{image_to_base64(resized_image)}" style="max-width: 100%; height: auto;">'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+                st.markdown('<p style="text-align: center;">Radiografía original</p>', unsafe_allow_html=True)
             
             with col2:
                 # Función para ajustar brillo y contraste
@@ -133,7 +148,15 @@ if uploaded_file is not None:
                 adjusted_image = adjust_brightness_contrast(image, 0, 0)  # Inicialmente sin ajustes
                 resized_adjusted = resize_image(adjusted_image)
                 preview_placeholder = st.empty()
-                preview_placeholder.image(resized_adjusted, use_container_width=False, caption="Vista previa con ajustes")
+                
+                # Mostrar imagen inicial
+                preview_placeholder.markdown(
+                    f'<div style="display: flex; justify-content: center;">'
+                    f'<img src="data:image/png;base64,{image_to_base64(resized_adjusted)}" style="max-width: 100%; height: auto;">'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+                st.markdown('<p style="text-align: center;">Vista previa con ajustes</p>', unsafe_allow_html=True)
             
             # Segunda fila: Controles de ajuste
             st.markdown("**⚙️ Ajustes de visualización**")
@@ -149,10 +172,15 @@ if uploaded_file is not None:
             if brightness != 0 or contrast != 0:
                 adjusted_image = adjust_brightness_contrast(image, brightness, contrast)
                 resized_adjusted = resize_image(adjusted_image)
-                preview_placeholder.image(resized_adjusted, use_container_width=False, caption="Vista previa con ajustes")
+                preview_placeholder.markdown(
+                    f'<div style="display: flex; justify-content: center;">'
+                    f'<img src="data:image/png;base64,{image_to_base64(resized_adjusted)}" style="max-width: 100%; height: auto;">'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
                 st.success(f"✅ Ajustes aplicados: Brillo {brightness:+d}, Contraste {contrast:+d}")
             else:
-                preview_placeholder.image(resize_image(image), use_container_width=False, caption="Vista previa con ajustes")
+                # Si no hay ajustes, mantener la imagen original
                 st.info("💡 Sin ajustes aplicados")
 
         # Guardar imagen original
@@ -195,7 +223,7 @@ if uploaded_file is not None:
                             class_id = int(box.cls.item())
                             confidence = box.conf.item()
                             
-                            # Mapear IDs de clase a nombres (ajusta según tu modelo)
+                            # Mapear IDs de clase a nombres
                             class_names = {0: "Fractura", 2: "Texto", 1: "Metal"}
                             
                             if class_id in class_names:
@@ -308,25 +336,65 @@ if uploaded_file is not None:
                 
                 # Mostrar detecciones de todas las clases
                 st.markdown("**Detalles de detección:**")
+
+                # Contenedor para centrar las métricas
+                st.markdown(
+                    """
+                    <div style="display: flex; justify-content: center; gap: 30px; margin: 20px 0;">
+                    """,
+                    unsafe_allow_html=True
+                )
+
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Fractura", f"{st.session_state.detections['Fractura']:.2f}", 
-                              delta=None, delta_color="normal")
+                    st.markdown(
+                        f'<div style="text-align: center;">'
+                        f'<div style="font-size: 16px; color: #666; margin-bottom: 8px;">Fractura</div>'
+                        f'<div style="font-size: 24px; font-weight: bold; color: #2196F3;">{st.session_state.detections["Fractura"]:.2f}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
                 with col2:
-                    st.metric("Texto", f"{st.session_state.detections['Texto']:.2f}", 
-                              delta=None, delta_color="normal")
+                    st.markdown(
+                        f'<div style="text-align: center;">'
+                        f'<div style="font-size: 16px; color: #666; margin-bottom: 8px;">Texto</div>'
+                        f'<div style="font-size: 24px; font-weight: bold; color: #2196F3;">{st.session_state.detections["Texto"]:.2f}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
                 with col3:
-                    st.metric("Metal", f"{st.session_state.detections['Metal']:.2f}", 
-                              delta=None, delta_color="normal")
+                    st.markdown(
+                        f'<div style="text-align: center;">'
+                        f'<div style="font-size: 16px; color: #666; margin-bottom: 8px;">Metal</div>'
+                        f'<div style="font-size: 24px; font-weight: bold; color: #2196F3;">{st.session_state.detections["Metal"]:.2f}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+
+                st.markdown("</div>", unsafe_allow_html=True)
                 
                 # Mostrar imágenes lado a lado
                 col1, col2 = st.columns(2)
                 with col1:
                     resized_original = resize_image(st.session_state.image)
-                    st.image(resized_original, use_container_width=False, caption="Imagen Original")
+                    # Imagen centrada 
+                    st.markdown(
+                        f'<div style="display: flex; justify-content: center;">'
+                        f'<img src="data:image/png;base64,{image_to_base64(resized_original)}" style="max-width: 100%; height: auto;">'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                    st.markdown('<p style="text-align: center;">Imagen Original</p>', unsafe_allow_html=True)
                 with col2:
                     resized_annotated = resize_image(st.session_state.annotated_image)
-                    st.image(resized_annotated, use_container_width=False, caption="Imagen Analizada")
+                    # Imagen centrada 
+                    st.markdown(
+                        f'<div style="display: flex; justify-content: center;">'
+                        f'<img src="data:image/png;base64,{image_to_base64(resized_annotated)}" style="max-width: 100%; height: auto;">'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                    st.markdown('<p style="text-align: center;">Imagen Analizada</p>', unsafe_allow_html=True)
                 
                 st.markdown(f"<p style='line-height: 1.6;'>{st.session_state.finding}</p>", unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
@@ -334,7 +402,9 @@ if uploaded_file is not None:
                 # Actualizar estado
                 st.rerun()
 
-        # Mostrar resultados si ya están listos (después de rerun)
+# --- Paso 2: Resultados del analisis ---////////////////////////////////////////////////////////////////////////
+
+        # Mostrar resultados si ya están listos
         if st.session_state.report_ready and st.session_state.annotated_image is not None:
             st.markdown('<div class="result-card">', unsafe_allow_html=True)
             st.subheader("2️⃣ Resultado del Análisis")
@@ -365,10 +435,24 @@ if uploaded_file is not None:
             col1, col2 = st.columns(2)
             with col1:
                 resized_original = resize_image(st.session_state.image)
-                st.image(resized_original, use_container_width=False, caption="Imagen Original")
+                # Imagen centrada
+                st.markdown(
+                    f'<div style="display: flex; justify-content: center;">'
+                    f'<img src="data:image/png;base64,{image_to_base64(resized_original)}" style="max-width: 100%; height: auto;">'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+                st.markdown('<p style="text-align: center;">Imagen Original</p>', unsafe_allow_html=True)
             with col2:
                 resized_annotated = resize_image(st.session_state.annotated_image)
-                st.image(resized_annotated, use_container_width=False, caption="Imagen Analizada")
+                # Imagen centrada
+                st.markdown(
+                    f'<div style="display: flex; justify-content: center;">'
+                    f'<img src="data:image/png;base64,{image_to_base64(resized_annotated)}" style="max-width: 100%; height: auto;">'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+                st.markdown('<p style="text-align: center;">Imagen Analizada</p>', unsafe_allow_html=True)
             
             st.markdown(f"<p style='line-height: 1.6;'>{st.session_state.finding}</p>", unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
@@ -376,10 +460,10 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"❌ Error al procesar la imagen: {str(e)}")
 
-# --- Paso 3: Generar informe ---
+# --- Paso 3: Generar informe ---////////////////////////////////////////////////////////////////////////
 if st.session_state.report_ready and st.session_state.annotated_image is not None:
     st.markdown('<h2 class="section-header">3️⃣ Generación de Informe Médico</h2>', unsafe_allow_html=True)
-    st.markdown("Complete los datos del paciente para generar un informe profesional listo para archivar.")
+    st.markdown("Complete los datos del paciente para generar un informe listo para descargar.")
 
     # Formulario
     with st.form(key="informe_form"):

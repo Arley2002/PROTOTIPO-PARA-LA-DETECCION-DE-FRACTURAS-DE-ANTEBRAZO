@@ -1,0 +1,11 @@
+streamlit>=1.35
+ultralytics>=8.1
+opencv-python>=4.8
+pillow>=10.2
+numpy>=1.26
+reportlab>=4.0
+pytest>=8.0
+
+# PyTorch CPU wheels (Windows): use PyTorch index for CPU builds
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
